@@ -16,7 +16,7 @@ df["자치구"] = df["district"]  # 자치구 이름 정리
 
 
 # 점수 계산 함수
-def calculate_scores(weights):
+def calculate_scores(weights,byNum ):
     features = list(weights.keys())
     weights_series = pd.Series(weights)
 
@@ -28,7 +28,7 @@ def calculate_scores(weights):
     df["score"] = df_selected.mul(weights_series).sum(axis=1)
 
     # 상위 3개 구 반환
-    result = df[["자치구", "score"]].sort_values(by="score", ascending=False).head(3)
+    result = df[["자치구", "score"]].sort_values(by="score", ascending=False).head(byNum)
     return result.to_dict(orient="records")
 
 
@@ -40,18 +40,22 @@ def index():
 @app.route("/recommend")
 def recommend():
     try:
-        #weights =  request.args.get('weights', default = '80', type = int )
+
         weights = {}
+        num = 3
 
         for key in request.args:
-            weights[key] = float(request.args.get(key))
+            if key == "num":
+                num = int(request.args[key])
+            else:
+                weights[key] = float(request.args.get(key))
 
         if not weights:
             return jsonify({"error": "가중치 데이터가 필요합니다."}), 400
 
 
         #weights = {'crime_rate':1}
-        result = calculate_scores(weights)
+        result = calculate_scores(weights, num)
 
         #response = make_response(jsonify({"result": result}))
         response = make_response(json.dumps({"result": result}, ensure_ascii=False))

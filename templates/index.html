@@ -26,30 +26,38 @@
 
     <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
 
-    <nav class="navbar navbar-light bg-light">
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
       <div class="container-fluid">
-        Bootstrap
+        <a class="navbar-brand" href="#">Navbar</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav">
+            <li class="nav-item">
+              <a class="nav-link active" aria-current="page" href="#">노인친화도시 검색</a>
+            </li>
+          </ul>
+        </div>
       </div>
     </nav>
     <div class="container">
         <form method="get" action="/recommend">
-            <div id="filters">
-                노인들이 살기좋은 도시의 조건을 동적으로 구성합니다.
+            <div class="row">
+                <div class="col-12">
+                    <div class="mb-3">
+                        <label for="num">결과 페이징</label>
+                        <select id="num" name="num" class="form-select">
+                            <option value="3">상위 3개 도시</option>
+                            <option value="5">상위 5개 도시</option>
+                            <option value="10">상위 10개 도시</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="filters" class="row">
+                    노인들이 살기좋은 도시의 조건을 동적으로 구성합니다.
+                </div>
             </div>
-<!--            <div class="mb-3">-->
-<!--                <label for="park" class="form-label">park</label>-->
-<!--                <input type="text" class="form-input" id="park" name="park">-->
-<!--            </div>-->
-<!--           <div class="mb-3">-->
-<!--                <label for="crime_rate" class="form-label">crime_rate</label>-->
-<!--                <input type="range" class="form-range" id="crime_rate" name="crime_rate" min="0" max="1" step="0.1" oninput="this.nextElementSibling.value = this.value">-->
-<!--                <output></output>-->
-<!--            </div>-->
-<!--            <div class="mb-3">-->
-<!--                <label for="walkability_score" class="form-label">walkability_score</label>-->
-<!--                <input type="range" class="form-range" id="walkability_score" name="walkability_score" min="0" max="1" step="0.1" oninput="this.nextElementSibling.value = this.value">-->
-<!--                <output></output>-->
-<!--            </div>-->
             <button type="submit" class="btn btn-primary" onclick="return fnCheck();">Enter</button>
         </form>
         <script>
@@ -69,7 +77,10 @@
                         ,'subway_station_count','subway_line_count','bus_stop_count','bus_stop_density','medical_corporations_count'
                         ,'emergency_room_count'];
 
+                // let filters = ['crime_rate'];
+
                 //$.each(object, function(index, element) { });
+
 
                 if(filters.length > 0)
                 {
@@ -78,15 +89,21 @@
                     $.each(filters,function(i,e){
 
                     $("#filters").append(`
-                            <div className="mb-3">
+                            <div class="mb-3 col-sm-6 col-md-3 col-lg-4">
                             <label for="${e}" class="form-label">${e}</label>
-                            <input type="range" class="form-range" id="${e}" name="${e}" min="1" max="5" step="1" oninput="this.nextElementSibling.value = this.value">
+                            <input type="range" class="form-range" id="${e}" name="${e}" min="1" max="5" step="1" oninput="this.nextElementSibling.value = test(this.value);">
                             <output></output>
                         </div>
                         `);
                     });
                 }
             });
+
+            function test(num){
+
+                let lst = ['최하','하','중','상','최상'];
+                return lst[num-1];
+            }
         </script>
   </body>
 
