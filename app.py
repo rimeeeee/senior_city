@@ -97,7 +97,7 @@ def index():
 @app.route("/recommend")
 def recommend():
     try:
-        num = int(request.args.get("num", 3))
+        num = int(request.args.get("num", 5))
         weights = {}
 
         # 카테고리 파싱
