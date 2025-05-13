@@ -343,5 +343,6 @@ def walk_sports_priority():
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
+
 if __name__ == "__main__":
     app.run(debug=True)
