@@ -93,6 +93,7 @@ def index():
 #     except Exception as e:
 #         return jsonify({"error": str(e)}), 400
 
+
 # 사용자 가중치 API
 @app.route("/recommend")
 def recommend():
