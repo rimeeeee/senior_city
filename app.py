@@ -1,3 +1,4 @@
+import os
 
 from flask import Flask, request, jsonify, make_response, render_template
 import pandas as pd
@@ -25,7 +26,7 @@ CATEGORY_COLUMNS = {
     "medical": ["medical_corporations_count", "emergency_room_count"],
     "social": ["employ"],
     "nature": ["green_space_per_capita"],
-    "air": ["pm2.5_level"]
+    "air": ["pm2_5_level"]
 }
 
 #안전:'crime_rate'
@@ -33,7 +34,6 @@ CATEGORY_COLUMNS = {
 #관계:'senior_center'
 #복지:'sports_center','welfare_facilities'
 #문화:'cultural_facilities'
-# 'senior_population'
 #대중교통:'subway_station_count','bus_stop_density'
 #의료:'medical_corporations_count','emergency_room_count'
 #사회참여:'employ'
@@ -346,4 +346,4 @@ def walk_sports_priority():
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
