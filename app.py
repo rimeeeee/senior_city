@@ -63,36 +63,6 @@ def index():
     return render_template('index.html')
 
 # API 라우팅
-# @app.route("/recommend")
-# def recommend():
-#     try:
-#
-#         weights = {}
-#         num = 3
-#
-#         for key in request.args:
-#             if key == "num":
-#                 num = int(request.args[key])
-#             else:
-#                 weights[key] = float(request.args.get(key))
-#
-#         if not weights:
-#             return jsonify({"error": "가중치 데이터가 필요합니다."}), 400
-#
-#
-#         #weights = {'crime_rate':1}
-#         result = calculate_scores(weights, num)
-#
-#         #response = make_response(jsonify({"result": result}))
-#         response = make_response(json.dumps({"result": result}, ensure_ascii=False))
-#         response.headers['Content-Type'] = 'application/json; charset=utf-8'
-#
-#         return response
-#
-#         #return jsonify({"result": result})
-#     except Exception as e:
-#         return jsonify({"error": str(e)}), 400
-
 
 # 사용자 가중치 API
 @app.route("/recommend")
@@ -114,9 +84,20 @@ def recommend():
         if not weights:
             return jsonify({"error": "가중치 입력이 필요합니다."}), 400
 
-        # 점수 계산
-        df_numeric = df[list(weights.keys())].astype(float)
+        # 반전해야 할 지표
+        INVERTED_COLS = ["crime_rate", "senior_pedestrian_accidents", "steep_slope_count", "pm2.5_level"]
+
+        # 가중치 적용용 복사본 생성
+        df_weighted = df.copy()
+        for col in weights:
+            if col in INVERTED_COLS:
+                df_weighted[col] = 1 - pd.to_numeric(df_weighted[col], errors="coerce")
+            else:
+                df_weighted[col] = pd.to_numeric(df_weighted[col], errors="coerce")
+
+        df_numeric = df_weighted[list(weights.keys())]
         score = df_numeric.mul(pd.Series(weights)).sum(axis=1)
+
         df_result = df.copy()
         df_result["score"] = score
 
@@ -379,16 +360,16 @@ def nature_priority():
 @app.route("/senior-friendly-top5")
 def senior_friendly_top5():
     try:
-        # 안전/보행 등 낮을수록 좋은 지표 반전
-        inverted_cols = ["crime_rate", "senior_pedestrian_accidents", "steep_slope_count", "pm2_5_level"]
+        inverted_cols = ["crime_rate", "senior_pedestrian_accidents", "steep_slope_count", "pm2.5_level"]
         df_copy = df.copy()
 
         for col in inverted_cols:
             if col in df_copy.columns:
-                df_copy[col] = 1 - df_copy[col]
+                df_copy[col] = 1 - pd.to_numeric(df_copy[col], errors="coerce")
 
-        # 평균 계산
         feature_cols = [col for col in df_copy.columns if col != "district"]
+        df_copy[feature_cols] = df_copy[feature_cols].apply(pd.to_numeric, errors="coerce")  # ⬅ 핵심 코드
+
         df_copy["overall_score"] = df_copy[feature_cols].mean(axis=1)
 
         result = (
