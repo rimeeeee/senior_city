@@ -394,5 +394,107 @@ def senior_friendly_top5():
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
+#F-11 – 고령 비친화 자치구 하위 5개
+@app.route("/senior-unfriendly-bottom5")
+def senior_unfriendly_bottom5():
+    try:
+        inverted_cols = ["crime_rate", "senior_pedestrian_accidents", "steep_slope_count", "pm2_5_level"]
+        df_copy = df.copy()
+
+        for col in inverted_cols:
+            if col in df_copy.columns:
+                df_copy[col] = 1 - pd.to_numeric(df_copy[col], errors="coerce")
+
+        feature_cols = [col for col in df_copy.columns if col != "district"]
+        df_copy[feature_cols] = df_copy[feature_cols].apply(pd.to_numeric, errors="coerce")
+        df_copy["overall_score"] = df_copy[feature_cols].mean(axis=1)
+
+        result = (
+            df_copy[["district", "overall_score"]]
+            .sort_values(by="overall_score", ascending=True)  # 하위 5개!
+            .head(5)
+            .to_dict(orient="records")
+        )
+
+        response = make_response(json.dumps({
+            "title": "고령 비친화 자치구 하위 5개",
+            "unit": "전체 지표 평균 점수 (낮을수록 친화도 낮음)",
+            "category": "overall",
+            "items": [
+                { "rank": i + 1, "name": row["district"], "score": round(row["overall_score"], 3) }
+                for i, row in enumerate(result)
+            ]
+        }, ensure_ascii=False))
+        response.headers["Content-Type"] = "application/json; charset=utf-8"
+        return response
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+#F-12 – 치안이 좋은 자치구 TOP 5
+@app.route("/safety-top5")
+def safety_top5():
+    try:
+        df_subset = df[["district", "crime_rate"]].copy()
+        df_subset["safety_score"] = 1 - pd.to_numeric(df_subset["crime_rate"], errors="coerce")
+
+        result = (
+            df_subset[["district", "safety_score"]]
+            .sort_values(by="safety_score", ascending=False)
+            .head(5)
+            .to_dict(orient="records")
+        )
+
+        response = make_response(json.dumps({
+            "title": "치안이 좋은 자치구 TOP 5",
+            "unit": "범죄율 (낮을수록 치안이 좋음)",
+            "category": "safety",
+            "items": [
+                { "rank": i + 1, "name": row["district"], "score": round(row["safety_score"], 3) }
+                for i, row in enumerate(result)
+            ]
+        }, ensure_ascii=False))
+        response.headers["Content-Type"] = "application/json; charset=utf-8"
+        return response
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+#F-13 – 보행환경이 좋은 자치구 TOP 5
+@app.route("/walkenv-top5")
+def walkenv_top5():
+    try:
+        cols = ["senior_pedestrian_accidents", "steep_slope_count"]
+        df_subset = df[["district"] + cols].copy()
+        for col in cols:
+            df_subset[col] = 1 - pd.to_numeric(df_subset[col], errors="coerce")
+
+        df_subset["walkenv_score"] = df_subset[cols].mean(axis=1)
+
+        result = (
+            df_subset[["district", "walkenv_score"]]
+            .sort_values(by="walkenv_score", ascending=False)
+            .head(5)
+            .to_dict(orient="records")
+        )
+
+        response = make_response(json.dumps({
+            "title": "보행환경이 좋은 자치구 TOP 5",
+            "unit": "보행자 사고/급경사지 (낮을수록 좋음)",
+            "category": "walkenv",
+            "items": [
+                { "rank": i + 1, "name": row["district"], "score": round(row["walkenv_score"], 3) }
+                for i, row in enumerate(result)
+            ]
+        }, ensure_ascii=False))
+        response.headers["Content-Type"] = "application/json; charset=utf-8"
+        return response
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
