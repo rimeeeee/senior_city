@@ -318,7 +318,7 @@ def culture_welfare_priority():
 @app.route("/walk-sports-priority")
 def walk_sports_priority():
     try:
-        cols = ["sports_center", "green_space_per_capita"]
+        cols = ["sports_center"]
         df_subset = df[["district"] + cols].copy()
         df_subset["activity_score"] = df_subset[cols].mean(axis=1)
 
@@ -331,7 +331,7 @@ def walk_sports_priority():
 
         response = make_response(json.dumps({
             "title": "산책·운동하기 좋은 동네 TOP 5",
-            "unit": "체육시설 수 + 1인당 녹지면적 평균",
+            "unit": "체육시설 수",
             "category": "activity",
             "items": [
                 { "rank": i + 1, "name": row["district"], "score": round(row["activity_score"], 3) }
@@ -344,6 +344,74 @@ def walk_sports_priority():
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
+
+#F-69 – 자연환경을 중요시하는 어르신을 위한 추천
+@app.route("/nature-priority")
+def nature_priority():
+    try:
+        df_subset = df[["district", "green_space_per_capita"]].copy()
+        df_subset["nature_score"] = df_subset["green_space_per_capita"]
+
+        result = (
+            df_subset[["district", "nature_score"]]
+            .sort_values(by="nature_score", ascending=False)
+            .head(5)
+            .to_dict(orient="records")
+        )
+
+        response = make_response(json.dumps({
+            "title": "자연환경이 좋은 동네 TOP 5",
+            "unit": "1인당 녹지면적",
+            "category": "nature",
+            "items": [
+                { "rank": i + 1, "name": row["district"], "score": round(row["nature_score"], 3) }
+                for i, row in enumerate(result)
+            ]
+        }, ensure_ascii=False))
+        response.headers["Content-Type"] = "application/json; charset=utf-8"
+        return response
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+#F-10 고령친화 자치구 추천
+@app.route("/senior-friendly-top5")
+def senior_friendly_top5():
+    try:
+        # 안전/보행 등 낮을수록 좋은 지표 반전
+        inverted_cols = ["crime_rate", "senior_pedestrian_accidents", "steep_slope_count", "pm2_5_level"]
+        df_copy = df.copy()
+
+        for col in inverted_cols:
+            if col in df_copy.columns:
+                df_copy[col] = 1 - df_copy[col]
+
+        # 평균 계산
+        feature_cols = [col for col in df_copy.columns if col != "district"]
+        df_copy["overall_score"] = df_copy[feature_cols].mean(axis=1)
+
+        result = (
+            df_copy[["district", "overall_score"]]
+            .sort_values(by="overall_score", ascending=False)
+            .head(5)
+            .to_dict(orient="records")
+        )
+
+        response = make_response(json.dumps({
+            "title": "고령친화 자치구 TOP 5",
+            "unit": "전체 지표 평균 점수 (안전/보행은 낮을수록 가중)",
+            "category": "overall",
+            "items": [
+                { "rank": i + 1, "name": row["district"], "score": round(row["overall_score"], 3) }
+                for i, row in enumerate(result)
+            ]
+        }, ensure_ascii=False))
+        response.headers["Content-Type"] = "application/json; charset=utf-8"
+        return response
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
