@@ -749,8 +749,14 @@ def nature_top5():
 def district_summary():
     try:
         name = request.args.get("name")
-        row = df[df["district"] == name].iloc[0]
+        filtered = df[df["district"] == name]
 
+        if filtered.empty:
+            return jsonify({"error": f"'{name}' 자치구를 찾을 수 없습니다."}), 404
+
+        row = filtered.iloc[0]
+
+        # 실제 지표 컬럼으로 점수 계산
         category_columns = {
             "safety": 1 - row["crime_rate"],
             "walkenv": 1 - row[["senior_pedestrian_accidents", "steep_slope_count"]].mean(),
@@ -760,8 +766,22 @@ def district_summary():
             "transport": row[["subway_station_count", "bus_stop_density"]].mean(),
             "medical": row[["medical_corporations_count", "emergency_room_count"]].mean(),
             "employment": row["employ"],
-            "air": 1 - row["pm2.5_level"],
+            "air": 1 - row["pm2_5_level"],
             "nature": row["green_space_per_capita"]
+        }
+
+        # 실제 컬럼 매핑 (다른 구 평균 계산용)
+        cat_to_cols = {
+            "safety": ["crime_rate"],
+            "walkenv": ["senior_pedestrian_accidents", "steep_slope_count"],
+            "relation": ["senior_center"],
+            "welfare": ["welfare_facilities", "sports_center"],
+            "culture": ["cultural_facilities"],
+            "transport": ["subway_station_count", "bus_stop_density"],
+            "medical": ["medical_corporations_count", "emergency_room_count"],
+            "employment": ["employ"],
+            "air": ["pm2_5_level"],
+            "nature": ["green_space_per_capita"]
         }
 
         category_labels = {
@@ -777,37 +797,42 @@ def district_summary():
             "nature": "자연환경이 가장 좋은"
         }
 
-        # 다른 구 평균과의 차이 계산
         max_diff = -float("inf")
         main_category = None
 
         for cat, val in category_columns.items():
-            overall_avg = df[df["district"] != name]
-            if cat in ["walkenv", "welfare", "medical", "transport"]:
-                cols = {
-                    "walkenv": ["senior_pedestrian_accidents", "steep_slope_count"],
-                    "welfare": ["welfare_facilities", "sports_center"],
-                    "medical": ["medical_corporations_count", "emergency_room_count"],
-                    "transport": ["subway_station_count", "bus_stop_density"]
-                }[cat]
-                overall_score = 1 - df[cols].mean(axis=1) if cat == "walkenv" else df[cols].mean(axis=1)
-                avg_score = overall_score[df["district"] != name].mean()
-            elif cat in ["safety", "air"]:
-                avg_score = 1 - df[df["district"] != name][cat + ("" if cat != "air" else ".5_level")].mean()
-            else:
-                avg_score = df[df["district"] != name][cat].mean()
+            cols = cat_to_cols[cat]
+            comp_df = df[df["district"] != name][cols].copy()
 
+            # 반전 필요한 지표 처리
+            if cat in ["safety", "walkenv", "air"]:
+                comp_df = 1 - comp_df
+
+            avg_score = comp_df.mean(axis=1).mean()
             diff = val - avg_score
+
             if diff > max_diff:
                 max_diff = diff
                 main_category = cat
 
         summary = f"{name}는 {category_labels[main_category]} 자치구입니다."
+        # 한글로 출력되게
+        summary = f"{name}는 {category_labels[main_category]} 자치구입니다."
 
-        return jsonify({"district": name, "summary": summary})
+        response = make_response(json.dumps({
+            "district": name,
+            "summary": summary
+        }, ensure_ascii=False))  # ✅ 한글 깨짐 방지
+
+        response.headers["Content-Type"] = "application/json; charset=utf-8"
+        return response
+
+
 
     except Exception as e:
         return jsonify({"error": str(e)}), 400
+
+
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
