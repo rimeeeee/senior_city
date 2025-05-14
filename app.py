@@ -6,17 +6,17 @@ import json
 from flask_cors import CORS
 
 
-#railway배포
-import mysql.connector
-
-def get_connection():
-    return mysql.connector.connect(
-        host="mysql.railway.internal",
-        user="root",
-        password="eBkFflFRICnvSVmRZcJCZIabKDwkVsKK",
-        database="railway",
-        port=3306
-    )
+# #railway배포
+# import mysql.connector
+#
+# def get_connection():
+#     return mysql.connector.connect(
+#         host="mysql.railway.internal",
+#         user="root",
+#         password="eBkFflFRICnvSVmRZcJCZIabKDwkVsKK",
+#         database="railway",
+#         port=3306
+#     )
 
 app = Flask(__name__)
 CORS(app)
@@ -849,4 +849,4 @@ def district_summary():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
