@@ -870,10 +870,14 @@ def district_features():
             "air": 1 - row["pm2_5_level"]
         }
 
-        return jsonify({
+        response = make_response(json.dumps({
             "district": name,
-            "features": {k: round(v, 3) for k, v in features.items()}
-        })
+            "features": {k: round(v, 2) for k, v in features.items()}
+        }, ensure_ascii=False))  # ✅ 한글 깨짐 방지
+
+        response.headers["Content-Type"] = "application/json; charset=utf-8"
+        return response
+
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
