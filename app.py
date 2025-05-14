@@ -845,8 +845,40 @@ def district_summary():
         return jsonify({"error": str(e)}), 400
 
 
+#F-99 – 자치구별 카테고리 점수 조회 API
+@app.route("/district-features")
+def district_features():
+    try:
+        name = request.args.get("name")
+        row = df[df["district"] == name]
 
+        if row.empty:
+            return jsonify({"error": f"{name} 자치구를 찾을 수 없습니다."}), 404
 
+        row = row.iloc[0]
+
+        features = {
+            "safety": 1 - row["crime_rate"],
+            "walkenv": 1 - row[["senior_pedestrian_accidents", "steep_slope_count"]].mean(),
+            "relation": row["senior_center"],
+            "welfare": row[["sports_center", "welfare_facilities"]].mean(),
+            "culture": row["cultural_facilities"],
+            "transport": row[["subway_station_count", "bus_stop_density"]].mean(),
+            "medical": row[["medical_corporations_count", "emergency_room_count"]].mean(),
+            "employment": row["employ"],
+            "nature": row["green_space_per_capita"],
+            "air": 1 - row["pm2_5_level"]
+        }
+
+        return jsonify({
+            "district": name,
+            "features": {k: round(v, 3) for k, v in features.items()}
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
