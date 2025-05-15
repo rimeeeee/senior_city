@@ -4,19 +4,33 @@ from flask import Flask, request, jsonify, make_response, render_template
 import pandas as pd
 import json
 from flask_cors import CORS
+from sqlalchemy import create_engine
 
 
-# #railway배포
-# import mysql.connector
-#
-# def get_connection():
-#     return mysql.connector.connect(
-#         host="mysql.railway.internal",
-#         user="root",
-#         password="eBkFflFRICnvSVmRZcJCZIabKDwkVsKK",
-#         database="railway",
-#         port=3306
-#     )
+
+
+
+import os
+import mysql.connector
+from sqlalchemy import create_engine
+
+# MySQL 접속 정보 (Railway 환경변수에서 받아옴)
+db_config = {
+    "host": os.getenv("DB_HOST", "mysql.railway.internal"),
+    "user": os.getenv("DB_USER", "root"),
+    "password": os.getenv("DB_PASSWORD", "eBkFflFRICnvSVmRZcJCZIabKDwkVsKK"),
+    "database": os.getenv("DB_NAME", "railway"),
+    "port": int(os.getenv("DB_PORT", 3306))
+}
+
+# mysql.connector 방식
+def get_connection():
+    return mysql.connector.connect(**db_config)
+
+# SQLAlchemy 방식
+engine = create_engine(
+    f"mysql+pymysql://{db_config['user']}:{db_config['password']}@{db_config['host']}/{db_config['database']}"
+)
 
 app = Flask(__name__)
 CORS(app)
@@ -26,6 +40,8 @@ CORS(app)
 df = pd.read_csv('final_df.csv', encoding='utf-8')  # 자치구별 노인친화 지표
 #df = df.iloc[2:].reset_index(drop=True)  # 데이터 시작 행 정리
 df["자치구"] = df["district"]  # 자치구 이름 정리
+
+df.to_sql(name = 'district_data', con=engine, if_exists="append", index=False)
 
 # 카테고리와 실제 컬럼 매핑
 CATEGORY_COLUMNS = {
@@ -885,4 +901,4 @@ def district_features():
     
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))

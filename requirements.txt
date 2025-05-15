@@ -2,3 +2,4 @@ Flask
 pandas
 flask_cors
 mysql-connector-python
+sqlalchemy
