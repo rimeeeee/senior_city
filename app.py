@@ -881,7 +881,7 @@ def district_features():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
+@app.route("/")
 def index():
     return "✅ Flask is running"
 
