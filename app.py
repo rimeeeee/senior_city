@@ -616,7 +616,6 @@ def top5_by_category():
                 "rank": i + 1,
                 "score": round(row["score"], 3),
                 "average": round(avg_val, 3)
-
             })
 
         response = make_response(json.dumps({"data": items}, ensure_ascii=False))
