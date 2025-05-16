@@ -4,33 +4,27 @@ from flask import Flask, request, jsonify, make_response, render_template
 import pandas as pd
 import json
 from flask_cors import CORS
-from sqlalchemy import create_engine
 
+# import mysql.connector
+# from sqlalchemy import create_engine
 
-
-
-
-import os
-import mysql.connector
-from sqlalchemy import create_engine
-
-# MySQL 접속 정보 (Railway 환경변수에서 받아옴)
-db_config = {
-    "host": os.getenv("DB_HOST", "mysql.railway.internal"),
-    "user": os.getenv("DB_USER", "root"),
-    "password": os.getenv("DB_PASSWORD", "eBkFflFRICnvSVmRZcJCZIabKDwkVsKK"),
-    "database": os.getenv("DB_NAME", "railway"),
-    "port": int(os.getenv("DB_PORT", 3306))
-}
-
-# mysql.connector 방식
-def get_connection():
-    return mysql.connector.connect(**db_config)
-
-# SQLAlchemy 방식
-engine = create_engine(
-    f"mysql+pymysql://{db_config['user']}:{db_config['password']}@{db_config['host']}/{db_config['database']}"
-)
+# # MySQL 접속 정보 (Railway 환경변수에서 받아옴)
+# db_config = {
+#     "host": os.getenv("DB_HOST", "mysql.railway.internal"),
+#     "user": os.getenv("DB_USER", "root"),
+#     "password": os.getenv("DB_PASSWORD", "eBkFflFRICnvSVmRZcJCZIabKDwkVsKK"),
+#     "database": os.getenv("DB_NAME", "railway"),
+#     "port": int(os.getenv("DB_PORT", 3306))
+# }
+#
+# # mysql.connector 방식
+# def get_connection():
+#     return mysql.connector.connect(**db_config)
+#
+# # SQLAlchemy 방식
+# engine = create_engine(
+#     f"mysql+pymysql://{db_config['user']}:{db_config['password']}@{db_config['host']}/{db_config['database']}"
+# )
 
 app = Flask(__name__)
 CORS(app)
@@ -41,7 +35,7 @@ df = pd.read_csv('final_df.csv', encoding='utf-8')  # 자치구별 노인친화 
 #df = df.iloc[2:].reset_index(drop=True)  # 데이터 시작 행 정리
 df["자치구"] = df["district"]  # 자치구 이름 정리
 
-df.to_sql(name = 'district_data', con=engine, if_exists="append", index=False)
+#df.to_sql(name = 'district_data', con=engine, if_exists="append", index=False)
 
 # 카테고리와 실제 컬럼 매핑
 CATEGORY_COLUMNS = {
@@ -148,14 +142,12 @@ def recommend():
 @app.route("/safety-priority")
 def safety_priority():
     try:
-        # 안전과 관련된 지표: 낮을수록 좋은 것들
+        # 안전 관련 지표: 낮을수록 안전함
         safety_cols = ["crime_rate", "senior_pedestrian_accidents"]
 
-        # 정규화된 값이므로 평균 계산
         df_subset = df[["district"] + safety_cols].copy()
         df_subset["safety_score"] = df_subset[safety_cols].mean(axis=1)
 
-        # 낮은 순서로 정렬 → 안전한 구
         result = (
             df_subset[["district", "safety_score"]]
             .sort_values(by="safety_score", ascending=True)
@@ -163,7 +155,15 @@ def safety_priority():
             .to_dict(orient="records")
         )
 
-        response = make_response(json.dumps({"result": result}, ensure_ascii=False))
+        response = make_response(json.dumps({
+            "title": "안전한 동네 TOP 5",
+            "unit": "범죄율 + 노인 보행자 사고 (낮을수록 안전)",
+            "category": "safety",
+            "items": [
+                { "rank": i + 1, "name": row["district"], "score": round(row["safety_score"], 3) }
+                for i, row in enumerate(result)
+            ]
+        }, ensure_ascii=False))
         response.headers["Content-Type"] = "application/json; charset=utf-8"
         return response
 
@@ -388,76 +388,184 @@ def nature_priority():
 @app.route("/senior-friendly-top5")
 def senior_friendly_top5():
     try:
-        inverted_cols = ["crime_rate", "senior_pedestrian_accidents", "steep_slope_count", "pm2.5_level"]
+        CATEGORY_COLUMNS = {
+            "안전": ["crime_rate"],
+            "보행환경": ["senior_pedestrian_accidents", "steep_slope_count"],
+            "관계": ["senior_center"],
+            "복지": ["sports_center", "welfare_facilities"],
+            "문화": ["cultural_facilities"],
+            "대중교통": ["subway_station_count", "bus_stop_density"],
+            "의료": ["medical_corporations_count", "emergency_room_count"],
+            "사회참여": ["employ"],
+            "자연": ["green_space_per_capita"],
+            "대기환경": ["pm2_5_level"]
+        }
+
+        category_labels = {
+            "안전": "치안이 가장 좋은",
+            "보행환경": "보행환경이 가장 좋은",
+            "관계": "경로당이 가장 많은",
+            "복지": "복지시설이 가장 많은",
+            "문화": "문화시설이 가장 많은",
+            "대중교통": "대중교통이 가장 편리한",
+            "의료": "의료 접근성이 가장 좋은",
+            "사회참여": "노인 일자리가 가장 많은",
+            "자연": "녹지가 가장 많은",
+            "대기환경": "대기환경이 가장 좋은"
+        }
+
         df_copy = df.copy()
+        scores = {}
 
-        for col in inverted_cols:
-            if col in df_copy.columns:
-                df_copy[col] = 1 - pd.to_numeric(df_copy[col], errors="coerce")
+        for cat, cols in CATEGORY_COLUMNS.items():
+            values = df_copy[cols].copy()
+            if cat in ["안전", "보행환경", "대기환경"]:
+                values = 1 - values
+            scores[cat] = values.mean(axis=1)
 
-        feature_cols = [col for col in df_copy.columns if col != "district"]
-        df_copy[feature_cols] = df_copy[feature_cols].apply(pd.to_numeric, errors="coerce")  # ⬅ 핵심 코드
+        df_copy["total_score"] = pd.DataFrame(scores).mean(axis=1)
+        top5 = df_copy.copy()
+        top5["total_score"] = df_copy["total_score"]
+        top5 = top5.sort_values(by="total_score", ascending=False).head(5)
 
-        df_copy["overall_score"] = df_copy[feature_cols].mean(axis=1)
+        avg_scores = {}
+        for k, cols in CATEGORY_COLUMNS.items():
+            temp_df = df[cols].copy()
+            if k in ["안전", "보행환경", "대기환경"]:
+                temp_df = 1 - temp_df
+            avg_scores[k] = round(temp_df.mean(axis=1).mean(), 3)
 
-        result = (
-            df_copy[["district", "overall_score"]]
-            .sort_values(by="overall_score", ascending=False)
-            .head(5)
-            .to_dict(orient="records")
-        )
+        result = []
+        for idx, row in enumerate(top5.itertuples(), start=1):
+            district_name = getattr(row, "district")
 
-        response = make_response(json.dumps({
-            "title": "고령친화 자치구 TOP 5",
-            "unit": "전체 지표 평균 점수 (안전/보행은 낮을수록 가중)",
-            "category": "overall",
-            "items": [
-                { "rank": i + 1, "name": row["district"], "score": round(row["overall_score"], 3) }
-                for i, row in enumerate(result)
-            ]
-        }, ensure_ascii=False))
+            # metricData 생성
+            metric_data = []
+            for cat, cols in CATEGORY_COLUMNS.items():
+                selected = df[df["district"] == district_name][cols].mean(axis=1).values[0]
+                if cat in ["안전", "보행환경", "대기환경"]:
+                    selected = 1 - selected
+                metric_data.append({
+                    "name": cat,
+                    "selectedDistrict": round(selected, 3),
+                    "average": avg_scores[cat]
+                })
+
+            # 설명 문장: 가장 두드러진 항목
+            max_diff = -float("inf")
+            best_cat = None
+            for cat in CATEGORY_COLUMNS:
+                district_val = [m["selectedDistrict"] for m in metric_data if m["name"] == cat][0]
+                diff = district_val - avg_scores[cat]
+                if diff > max_diff:
+                    max_diff = diff
+                    best_cat = cat
+
+            result.append({
+                "district": district_name,
+                "rank": idx,
+                "metricData": metric_data,
+                "info": f"{district_name}는 {category_labels[best_cat]} 동네입니다."
+            })
+
+        response = make_response(json.dumps({"data": result}, ensure_ascii=False))
         response.headers["Content-Type"] = "application/json; charset=utf-8"
         return response
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 400
+        return jsonify({ "error": str(e) }), 500
+
 
 #F-11 – 고령 비친화 자치구 하위 5개
-@app.route("/senior-unfriendly-bottom5")
-def senior_unfriendly_bottom5():
+@app.route("/senior-unfriendly-top5")
+def senior_unfriendly_top5():
     try:
-        inverted_cols = ["crime_rate", "senior_pedestrian_accidents", "steep_slope_count", "pm2_5_level"]
+        CATEGORY_COLUMNS = {
+            "안전": ["crime_rate"],
+            "보행환경": ["senior_pedestrian_accidents", "steep_slope_count"],
+            "관계": ["senior_center"],
+            "복지": ["sports_center", "welfare_facilities"],
+            "문화": ["cultural_facilities"],
+            "대중교통": ["subway_station_count", "bus_stop_density"],
+            "의료": ["medical_corporations_count", "emergency_room_count"],
+            "사회참여": ["employ"],
+            "자연": ["green_space_per_capita"],
+            "대기환경": ["pm2_5_level"]
+        }
+
+        category_labels = {
+            "안전": "치안이 가장 부족한",
+            "보행환경": "보행환경이 가장 열악한",
+            "관계": "경로당이 가장 적은",
+            "복지": "복지시설이 가장 부족한",
+            "문화": "문화시설이 가장 적은",
+            "대중교통": "대중교통 접근성이 가장 낮은",
+            "의료": "의료 접근성이 가장 부족한",
+            "사회참여": "노인 일자리가 가장 부족한",
+            "자연": "녹지가 가장 적은",
+            "대기환경": "대기질이 가장 나쁜"
+        }
+
         df_copy = df.copy()
+        scores = {}
 
-        for col in inverted_cols:
-            if col in df_copy.columns:
-                df_copy[col] = 1 - pd.to_numeric(df_copy[col], errors="coerce")
+        for cat, cols in CATEGORY_COLUMNS.items():
+            values = df_copy[cols].copy()
+            if cat in ["안전", "보행환경", "대기환경"]:
+                values = 1 - values
+            scores[cat] = values.mean(axis=1)
 
-        feature_cols = [col for col in df_copy.columns if col != "district"]
-        df_copy[feature_cols] = df_copy[feature_cols].apply(pd.to_numeric, errors="coerce")
-        df_copy["overall_score"] = df_copy[feature_cols].mean(axis=1)
+        df_copy["total_score"] = pd.DataFrame(scores).mean(axis=1)
+        bottom5 = df_copy.copy()
+        bottom5["total_score"] = df_copy["total_score"]
+        bottom5 = bottom5.sort_values(by="total_score", ascending=True).head(5)
 
-        result = (
-            df_copy[["district", "overall_score"]]
-            .sort_values(by="overall_score", ascending=True)  # 하위 5개!
-            .head(5)
-            .to_dict(orient="records")
-        )
+        avg_scores = {}
+        for k, cols in CATEGORY_COLUMNS.items():
+            temp_df = df[cols].copy()
+            if k in ["안전", "보행환경", "대기환경"]:
+                temp_df = 1 - temp_df
+            avg_scores[k] = round(temp_df.mean(axis=1).mean(), 3)
 
-        response = make_response(json.dumps({
-            "title": "고령 비친화 자치구 하위 5개",
-            "unit": "전체 지표 평균 점수 (낮을수록 친화도 낮음)",
-            "category": "overall",
-            "items": [
-                { "rank": i + 1, "name": row["district"], "score": round(row["overall_score"], 3) }
-                for i, row in enumerate(result)
-            ]
-        }, ensure_ascii=False))
+        result = []
+        for idx, row in enumerate(bottom5.itertuples(), start=1):
+            district_name = getattr(row, "district")
+
+            metric_data = []
+            for cat, cols in CATEGORY_COLUMNS.items():
+                selected = df[df["district"] == district_name][cols].mean(axis=1).values[0]
+                if cat in ["안전", "보행환경", "대기환경"]:
+                    selected = 1 - selected
+                metric_data.append({
+                    "name": cat,
+                    "selectedDistrict": round(selected, 3),
+                    "average": avg_scores[cat]
+                })
+
+            # 가장 부족한 지표 = 평균 대비 차이가 가장 큰 음수
+            min_diff = float("inf")
+            worst_cat = None
+            for cat in CATEGORY_COLUMNS:
+                district_val = [m["selectedDistrict"] for m in metric_data if m["name"] == cat][0]
+                diff = district_val - avg_scores[cat]
+                if diff < min_diff:
+                    min_diff = diff
+                    worst_cat = cat
+
+            result.append({
+                "district": district_name,
+                "rank": idx,
+                "metricData": metric_data,
+                "info": f"{district_name}는 {category_labels[worst_cat]} 동네입니다."
+            })
+
+        # ensure_ascii=False로 응답
+        response = make_response(json.dumps({ "data": result }, ensure_ascii=False))
         response.headers["Content-Type"] = "application/json; charset=utf-8"
         return response
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 400
+        return jsonify({"error": str(e)}), 500
 
 
 #F-12 – 치안이 좋은 자치구 TOP 5
@@ -900,5 +1008,7 @@ def district_features():
 
     
 
+# if __name__ == "__main__":
+#     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    app.run(host="0.0.0.0", port=5000)
