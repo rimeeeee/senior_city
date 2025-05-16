@@ -618,6 +618,7 @@ def top5_by_category():
                 "average": round(avg_val, 3)
             })
 
+
         response = make_response(json.dumps({"data": items}, ensure_ascii=False))
         response.headers["Content-Type"] = "application/json; charset=utf-8"
         return response
