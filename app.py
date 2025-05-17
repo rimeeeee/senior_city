@@ -1,30 +1,37 @@
+
 import os
 
 from flask import Flask, request, jsonify, make_response, render_template
 import pandas as pd
-import json
+import pymysql
 from flask_cors import CORS
+import mysql.connector
+from sqlalchemy import create_engine
 
-# import mysql.connector
-# from sqlalchemy import create_engine
+# #SQLAlchemy 방식
+# engine = create_engine(
+#     f"mysql+pymysql://{db_config['user']}:{db_config['password']}@{db_config['host']}/{db_config['database']}"
+# )
 
-# # MySQL 접속 정보 (Railway 환경변수에서 받아옴)
-# db_config = {
-#     "host": os.getenv("DB_HOST", "mysql.railway.internal"),
-#     "user": os.getenv("DB_USER", "root"),
-#     "password": os.getenv("DB_PASSWORD", "eBkFflFRICnvSVmRZcJCZIabKDwkVsKK"),
-#     "database": os.getenv("DB_NAME", "railway"),
-#     "port": int(os.getenv("DB_PORT", 3306))
-# }
-#
+
+from dotenv import load_dotenv
+load_dotenv(dotenv_path="./.env")  # 로컬에서만 자동 돌아가는 함수
+# local 에서는 .env 파일 참조, cloud에서는 railway 환경변수 자동 참조
+conn = pymysql.connect(
+    host=os.getenv("MYSQLHOST"),
+    port=int(os.getenv("MYSQLPORT")),
+    user=os.getenv("MYSQLUSER"),
+    password=os.getenv("MYSQLPASSWORD"),
+    db=os.getenv("MYSQL_DATABASE"),
+    charset='utf8mb4',
+    cursorclass=pymysql.cursors.DictCursor
+)
+
 # # mysql.connector 방식
 # def get_connection():
 #     return mysql.connector.connect(**db_config)
 #
-# # SQLAlchemy 방식
-# engine = create_engine(
-#     f"mysql+pymysql://{db_config['user']}:{db_config['password']}@{db_config['host']}/{db_config['database']}"
-# )
+
 
 app = Flask(__name__)
 CORS(app)
