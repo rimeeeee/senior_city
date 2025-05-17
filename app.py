@@ -846,9 +846,31 @@ def district_summary():
     except Exception as e:
         return jsonify({"error": str(e)}), 400
     
-# # F-67 가장 많이 1위로 나온 TOP3 자치구 각각 몇 번 나왔는지까지. 
-# @app.route("/top3-district", method = ['GET'])
-# def get_top_district():
+# F-67 가장 많이 1위로 나온 TOP3 자치구 각각 몇 번 나왔는지까지. 
+@app.route("/top3-district", methods = ['GET'])
+def get_top_district():
+    try:
+        cursor = conn.cursor()
+        query = """
+                SELECT top1 AS district, COUNT(*) AS count
+                FROM district_ranking 
+                GROUP BY top1
+                ORDER BY COUNT(*) DESC
+                LIMIT 3;
+                """
+        cursor.execute(query)
+        result = cursor.fetchall()
+        
+        return jsonify(result)
+    
+    except Exception as e:
+        return jsonify({'error' : str(e)}), 500
+    
+    finally:
+        cursor.close()
+
+
+        
 
 
 

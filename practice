@@ -1,0 +1,52 @@
+import os
+
+from flask import Flask, request, jsonify, make_response, render_template
+import pandas as pd
+import json
+from flask_cors import CORS
+import pymysql
+from dotenv import load_dotenv
+
+load_dotenv() # 로컬에서만 자동 돌아가는 함수
+# local 에서는 .env 파일 참조, cloud에서는 railway 환경변수 자동 참조
+conn = pymysql.connect(
+    host = os.getenv("MYSQLHOST"),
+    port = int(os.getenv("MYSQLPORT")),
+    user = os.getenv("MYSQLUSER"),
+    password = os.getenv("MYSQLPASSWORD"),
+    db = os.getenv("MYSQL_DATABASE"),
+    charset = 'utf8mb4',
+    cursorclass = pymysql.cursors.DictCursor
+)
+print('연결성공')
+
+
+app = Flask(__name__)
+CORS(app)
+
+
+@app.route("/top3-district", methods = ['GET'])
+def get_top_district():
+    try:
+        cursor = conn.cursor()
+        query = """
+                SELECT top1 AS district, COUNT(*) AS count
+                FROM district_ranking 
+                GROUP BY top1
+                ORDER BY COUNT(*) DESC
+                LIMIT 3;
+                """
+        cursor.execute(query)
+        result = cursor.fetchall()
+        
+        return jsonify(result)
+    
+    except Exception as e:
+        return jsonify({'error' : str(e)}), 500
+    
+    finally:
+        cursor.close()
+
+
+if __name__ == "__main__":
+    app.run(debug=True)
