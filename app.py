@@ -387,6 +387,7 @@ def nature_priority():
 from flask import request, jsonify, make_response
 import json
 
+
 @app.route("/district-top5")
 def district_top5():
     try:
@@ -454,13 +455,20 @@ def district_top5():
         # 결과 포맷 구성
         result = []
         for i, row in df_sorted.iterrows():
-            metric_data = [
-                {
-                    "name": cat,
-                    "selectedDistrict": round(row[cat], 3),
-                    "average": avg_scores[cat]
-                } for cat in CATEGORY_COLUMNS
-            ]
+            if mode == "category":
+                metric_data = [{
+                    "name": category_name,
+                    "selectedDistrict": round(row[category_name], 3),
+                    "average": avg_scores[category_name]
+                }]
+            else:
+                metric_data = [
+                    {
+                        "name": cat,
+                        "selectedDistrict": round(row[cat], 3),
+                        "average": avg_scores[cat]
+                    } for cat in CATEGORY_COLUMNS
+                ]
 
             # info 문구
             if mode == "friendly" or mode == "unfriendly":
@@ -474,15 +482,17 @@ def district_top5():
                 label = category_labels.get(target_cat, "")
                 info = f"{row['district']}는 {label} 동네입니다."
             else:
-                label = category_labels.get(category_name, "")
-                info = f"{row['district']}는 {label} 동네입니다."
+                info = None
 
-            result.append({
+            entry = {
                 "district": row["district"],
                 "rank": i + 1,
-                "metricData": metric_data,
-                "info": info
-            })
+                "metricData": metric_data
+            }
+            if info:
+                entry["info"] = info
+
+            result.append(entry)
 
         response = make_response(json.dumps({"data": result}, ensure_ascii=False))
         response.headers["Content-Type"] = "application/json; charset=utf-8"
@@ -490,6 +500,8 @@ def district_top5():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
 
 
 # #F-10 고령친화 자치구 추천
