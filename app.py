@@ -4,19 +4,21 @@ from flask import Flask, request, jsonify, make_response, render_template
 import pandas as pd
 import json
 from flask_cors import CORS
+import pymysql
+from dotenv import load_dotenv
 
+load_dotenv() # 로컬에서만 자동 돌아가는 함수
+# local 에서는 .env 파일 참조, cloud에서는 railway 환경변수 자동 참조
+conn = pymysql.connect(
+    host = os.getenv("MYSQLHOST"),
+    port = int(os.getenv("MYSQLPORT")),
+    user = os.getenv("MYSQLUSER"),
+    password = os.getenv("MYSQLPASSWORD"),
+    db = os.getenv("MYSQL_DATABASE"),
+    charset = 'utf8mb4',
+    cursorclass = pymysql.cursors.DictCursor
+)
 
-# #railway배포
-# import mysql.connector
-#
-# def get_connection():
-#     return mysql.connector.connect(
-#         host="mysql.railway.internal",
-#         user="root",
-#         password="eBkFflFRICnvSVmRZcJCZIabKDwkVsKK",
-#         database="railway",
-#         port=3306
-#     )
 
 app = Flask(__name__)
 CORS(app)
@@ -843,6 +845,11 @@ def district_summary():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 400
+    
+# # F-67 가장 많이 1위로 나온 TOP3 자치구 각각 몇 번 나왔는지까지. 
+# @app.route("/top3-district", method = ['GET'])
+# def get_top_district():
+
 
 
 #F-99 – 자치구별 카테고리 점수 조회 API
