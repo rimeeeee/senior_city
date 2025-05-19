@@ -1,11 +1,11 @@
 import os
-
 from flask import Flask, request, jsonify, make_response, render_template
 import pandas as pd
 import json
 from flask_cors import CORS
 import pymysql
 from dotenv import load_dotenv
+from collections import defaultdict
 
 load_dotenv() # 로컬에서만 자동 돌아가는 함수
 # local 에서는 .env 파일 참조, cloud에서는 railway 환경변수 자동 참조
@@ -97,6 +97,22 @@ def recommend():
 
         if not weights:
             return jsonify({"error": "가중치 입력이 필요합니다."}), 400
+        
+        #가중치 DB저장 추가 코드
+        try:
+            cursor = conn.cursor()
+            insert_query = """
+                            INSERT INTO question_weights
+                            (q1,q2,q3,q4,q5,q6,q7,q8,q9,q10)
+                            VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                            """
+            questions = [f'q{i}' for i in range(1,11)]
+            values = tuple(float(request.args.get(q,0)) for q in questions)
+            
+            cursor.execute(insert_query, values)
+            conn.commit()
+        except Exception as db_err:
+            print('가중치 저장 실패: ', db_err)
 
         # 반전해야 할 지표
         INVERTED_COLS = ["crime_rate", "senior_pedestrian_accidents", "steep_slope_count", "pm2.5_level"]
@@ -623,15 +639,67 @@ def get_top_district():
                 LIMIT 3;
                 """
         cursor.execute(query)
-        result = cursor.fetchall()
-        
-        return jsonify(result)
+        result = cursor.fetchall()     
+        return jsonify({"district" : []})
     
     except Exception as e:
         return jsonify({'error' : str(e)}), 500
     
     finally:
         cursor.close()
+
+# F-68 가장 높은 점수를 받은 컬럼 top 5 즉 질문 카테고리
+@app.route('/top5-categories', methods = ['GET'])
+def get_top5_categories():
+    try:
+        cursor = conn.cursor()
+        query = """
+                SELECT 
+                AVG(q1) AS q1,AVG(q2) AS q2,AVG(q3) AS q3,
+                AVG(q4) AS q4,AVG(q5) AS q5,AVG(q6) AS q6,
+                AVG(q7) AS q7,AVG(q8) AS q8,AVG(q9) AS q9,
+                AVG(q10) AS q10
+                FROM question_weights
+                """
+        cursor.execute(query)
+        row = cursor.fetchone()
+
+        q_to_category = {
+        'q1': '안전',
+        'q2': '보행환경',
+        'q3': '자연',
+        'q4': '복지',
+        'q5': '문화',
+        'q6': '관계',
+        'q7': '대중교통',
+        'q8': '사회참여',
+        'q9': '의료',
+        'q10': '대기환경'
+    }
+        category_scores = defaultdict(float)
+        for question, score in row.items():
+            category = q_to_category.get(question)
+            if category and score is not None:
+                category_scores[category] += score
+        if not category_scores:
+            return jsonify({"top_categories" : []})
+        
+        top5 = sorted(category_scores.items(), key = lambda x: x[1], reverse=True)[:5]
+        result = [{'category' : k, 'score' : round(v,2)} for k, v in top5]
+
+        return jsonify({'top_categories' : result})
+    
+    except Exception as e:
+        return jsonify({'error' : str(e)}), 500
+    
+    finally:
+        cursor.close()
+
+
+
+
+
+
 
 
         
