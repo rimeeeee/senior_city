@@ -875,9 +875,8 @@ def get_top_district():
                 LIMIT 3;
                 """
         cursor.execute(query)
-        result = cursor.fetchall()
-        
-        return jsonify(result)
+        result = cursor.fetchall()     
+        return jsonify({"district" : []})
     
     except Exception as e:
         return jsonify({'error' : str(e)}), 500
