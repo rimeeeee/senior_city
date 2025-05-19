@@ -470,6 +470,8 @@ def district_top5():
 
         df_score = pd.DataFrame(score_map)
         df_score["district"] = df["district"]
+        df_score["longitude"] = df["longitude"]
+        df_score["latitude"] = df["latitude"]
 
         if mode == "friendly" or mode == "unfriendly":
             df_score["total_score"] = df_score[list(CATEGORY_COLUMNS.keys())].mean(axis=1)
@@ -522,8 +524,8 @@ def district_top5():
             entry = {
                 "district": row["district"],
                 "rank": i + 1,
-                "latitude": row["latitude"],
                 "longitude": row["longitude"],
+                "latitude": row["latitude"],
                 "metricData": metric_data
             }
             if info:
